@@ -2,43 +2,37 @@ package org.luksza.gerrit.replication.updater;
 
 import com.google.common.flogger.FluentLogger;
 import com.google.gerrit.extensions.events.LifecycleListener;
+import com.google.gerrit.extensions.registration.DynamicItem;
 import com.google.gerrit.lifecycle.LifecycleModule;
 import com.google.inject.AbstractModule;
 import com.google.inject.Inject;
-import com.googlesource.gerrit.plugins.replication.ReplicationConfigModule;
 import com.googlesource.gerrit.plugins.replication.ReplicationRemotesUpdater;
-import org.eclipse.jgit.lib.Config;
-
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import org.eclipse.jgit.lib.Config;
 
 public class Module extends AbstractModule {
-  private final ReplicationConfigModule configModule;
-
-  @Inject
-  Module(ReplicationConfigModule configModule) {
-    this.configModule = configModule;
-  }
 
   @Override
   protected void configure() {
-    install(configModule);
-    
-    install(new LifecycleModule() {
-      @Override
-      protected void configure() {
-        listener().to(DelayedReplicationConfigUpdate.class);
-      }
-    });
+
+    install(
+        new LifecycleModule() {
+          @Override
+          protected void configure() {
+            listener().to(DelayedReplicationConfigUpdate.class);
+          }
+        });
   }
 
   static class DelayedReplicationConfigUpdate implements LifecycleListener {
     private static final FluentLogger logger = FluentLogger.forEnclosingClass();
-    private final ReplicationRemotesUpdater replicationRemotesUpdater;
+    private final DynamicItem<ReplicationRemotesUpdater> replicationRemotesUpdater;
 
     @Inject
-    DelayedReplicationConfigUpdate(ReplicationRemotesUpdater replicationRemoteUpdater) {
-      this.replicationRemotesUpdater = replicationRemoteUpdater;
+    DelayedReplicationConfigUpdate(
+        DynamicItem<ReplicationRemotesUpdater> replicationRemotesUpdater) {
+      this.replicationRemotesUpdater = replicationRemotesUpdater;
     }
 
     @Override
@@ -59,7 +53,7 @@ public class Module extends AbstractModule {
 
       try {
         TimeUnit.SECONDS.sleep(timeout);
-        replicationRemotesUpdater.update(updates);
+        replicationRemotesUpdater.get().update(updates);
         logger.atInfo().log("replication remote configuration updated");
       } catch (IOException | InterruptedException e) {
         logger.atSevere().withCause(e).log("could not update replication remotes");
